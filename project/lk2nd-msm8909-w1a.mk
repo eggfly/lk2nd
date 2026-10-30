@@ -15,3 +15,7 @@ LK2ND_DISPLAY := cont-splash
 LK2ND_FORCE_FASTBOOT := 1
 LK2ND_DTBS := msm8909-cmcc-w1a.dtb
 include lk2nd/project/lk2nd.mk
+
+# Quiet boot: no menu unless the small button is held as lk2nd starts
+# (or Linux did "reboot bootloader"); see menu.c.
+DEFINES += LK2ND_QUIET_BOOT=1 LK2ND_QUIET_BOOT_MS=300

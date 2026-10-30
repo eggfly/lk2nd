@@ -390,6 +390,10 @@ char get_variant[MAX_RSP_SIZE];
 
 extern int emmc_recovery_init(void);
 
+/* Set when we were rebooted with the "bootloader" reason (e.g. Linux
+ * "reboot bootloader"): the lk2nd menu skips its quiet-boot window. */
+bool lk2nd_fastboot_requested;
+
 #if NO_KEYPAD_DRIVER
 extern int fastboot_trigger(void);
 #endif
@@ -5614,6 +5618,7 @@ void aboot_init(const struct app_descriptor *app)
 	else if(reboot_mode == FASTBOOT_MODE)
 	{
 		boot_into_fastboot = true;
+		lk2nd_fastboot_requested = true;
 	}
 	else if(reboot_mode == ALARM_BOOT)
 	{

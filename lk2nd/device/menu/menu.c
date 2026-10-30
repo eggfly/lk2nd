@@ -92,6 +92,9 @@ static uint16_t lk2nd_boot_pressed_key(void)
 #define LONG_PRESS_DURATION 1000
 #define MENU_TIMEOUT_MS 4000
 
+extern bool lk2nd_fastboot_requested;
+static bool menu_no_timeout;
+
 static uint16_t wait_key_timeout(uint32_t timeout_ms)
 {
 	uint64_t deadline = (timeout_ms > 0) ? (current_time() + timeout_ms) : 0;
@@ -172,6 +175,20 @@ static struct {
 
 void display_default_image_on_screen(void);
 
+#if LK2ND_QUIET_BOOT
+static bool quiet_key_held(void)
+{
+	uint64_t deadline = current_time() + LK2ND_QUIET_BOOT_MS;
+
+	while (current_time() < deadline) {
+		if (lk2nd_keys_pressed(KEY_VOLUMEDOWN))
+			return true;
+		thread_sleep(1);
+	}
+	return false;
+}
+#endif
+
 void display_fastboot_menu(void)
 {
 	struct fbcon_config *fb = fbcon_display();
@@ -181,6 +198,31 @@ void display_fastboot_menu(void)
 
 	if (!fb)
 		return;
+
+#if LK2ND_QUIET_BOOT
+	/*
+	 * Quiet boot: on the first menu entry, draw nothing and give the
+	 * user LK2ND_QUIET_BOOT_MS to hold the small button.  No button ->
+	 * continue straight away (the splash stays on screen).  The button,
+	 * or a reboot into "bootloader", shows the menu without the auto-boot
+	 * timeout.  The power key does not count: it is often still held from
+	 * powering on.
+	 * A failed continue lands back here and shows the menu, untimed.
+	 */
+	{
+		static bool quiet_done;
+
+		if (!quiet_done) {
+			quiet_done = true;
+			menu_no_timeout = true;
+			if (!lk2nd_fastboot_requested && !quiet_key_held()) {
+				dprintf(INFO, "menu: quiet boot, no key - continue\n");
+				opt_continue();
+				return;
+			}
+		}
+	}
+#endif
 
 	/*
 	 * Make sure the specified line lenght fits on the screen.
@@ -277,7 +319,7 @@ void display_fastboot_menu(void)
 
 		{
 			uint16_t keycode;
-			if (first_key) {
+			if (first_key && !menu_no_timeout) {
 				/*
 				 * Show a static auto-boot message and wait.  MDP3
 				 * cont-splash cannot do repeated fbcon updates
@@ -341,6 +383,7 @@ void display_fastboot_menu(void)
 void display_default_image_on_screen(void);
 void display_default_image_on_screen(void)
 {
+#if !LK2ND_QUIET_BOOT
 	struct fbcon_config *fb = fbcon_display();
 	int y, incr;
 
@@ -356,4 +399,5 @@ void display_default_image_on_screen(void)
 	fbcon_puts_ln(WHITE, y, incr, true, xstr(BOARD));
 	fbcon_puts_ln(SILVER, y, incr, true, LK2ND_VERSION);
 	fbcon_flush();
+#endif
 }
